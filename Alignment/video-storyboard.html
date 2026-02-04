@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Storyboard Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: #fff;
+            color: #000;
+            padding: 20px;
+            text-align: center;
+            border-bottom: 3px solid #000;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+
+        .upload-section {
+            padding: 40px 20px;
+            text-align: center;
+            background: #111;
+        }
+
+        .upload-box {
+            border: 3px dashed #fff;
+            padding: 60px 40px;
+            max-width: 600px;
+            margin: 0 auto;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .upload-box:hover {
+            background: #222;
+            border-color: #ccc;
+        }
+
+        .upload-box input[type="file"] {
+            display: none;
+        }
+
+        .upload-box label {
+            cursor: pointer;
+            font-size: 1.2rem;
+            display: block;
+        }
+
+        .btn {
+            background: #fff;
+            color: #000;
+            border: 2px solid #fff;
+            padding: 12px 30px;
+            font-size: 1rem;
+            font-family: 'Courier New', monospace;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+
+        .btn:hover {
+            background: #000;
+            color: #fff;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status {
+            padding: 20px;
+            text-align: center;
+            font-size: 1.1rem;
+            background: #1a1a1a;
+            border-top: 2px solid #333;
+            border-bottom: 2px solid #333;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #333;
+            margin: 20px 0;
+            border: 2px solid #fff;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #fff;
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        .storyboard-container {
+            padding: 40px 20px;
+            flex: 1;
+        }
+
+        .controls {
+            text-align: center;
+            padding: 20px;
+            background: #111;
+            border-bottom: 2px solid #333;
+        }
+
+        .storyboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .frame-card {
+            background: #1a1a1a;
+            border: 2px solid #fff;
+            padding: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .frame-card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+        }
+
+        .frame-card img {
+            width: 100%;
+            height: auto;
+            display: block;
+            border: 1px solid #666;
+        }
+
+        .frame-info {
+            padding: 10px;
+            font-size: 0.9rem;
+            color: #ccc;
+        }
+
+        .scene-number {
+            font-weight: bold;
+            color: #fff;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            max-width: 90%;
+            max-height: 90%;
+            position: relative;
+        }
+
+        .modal-content img {
+            max-width: 100%;
+            max-height: 90vh;
+            border: 3px solid #fff;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: -40px;
+            right: 0;
+            background: #fff;
+            color: #000;
+            border: none;
+            font-size: 2rem;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .modal-info {
+            color: #fff;
+            text-align: center;
+            margin-top: 20px;
+            font-size: 1.1rem;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            border: 4px solid #333;
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            color: #ff6b6b;
+            background: #2a1515;
+            padding: 20px;
+            margin: 20px;
+            border: 2px solid #ff6b6b;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>VIDEO STORYBOARD GENERATOR</h1>
+    </div>
+
+    <div class="upload-section">
+        <div class="upload-box" id="uploadBox">
+            <input type="file" id="videoInput" accept="video/*">
+            <label for="videoInput">
+                <p style="font-size: 3rem; margin-bottom: 20px;">📹</p>
+                <p>CLICK TO UPLOAD VIDEO</p>
+                <p style="margin-top: 10px; font-size: 0.9rem; color: #ccc;">Max 10 minutes</p>
+            </label>
+        </div>
+        <button class="btn" id="processBtn" disabled>GENERATE STORYBOARD</button>
+    </div>
+
+    <div class="status hidden" id="statusSection">
+        <div id="statusText">Initializing...</div>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+    </div>
+
+    <div class="controls hidden" id="controlsSection">
+        <button class="btn" id="downloadBtn">DOWNLOAD STORYBOARD</button>
+        <button class="btn" id="resetBtn">START OVER</button>
+    </div>
+
+    <div class="storyboard-container hidden" id="storyboardContainer">
+        <div class="storyboard-grid" id="storyboardGrid"></div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal" id="modal">
+        <div class="modal-content">
+            <button class="modal-close" id="modalClose">×</button>
+            <img id="modalImage" src="" alt="Frame">
+            <div class="modal-info" id="modalInfo"></div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const CONFIG = {
+            replicateProxy: "https://itp-ima-replicate-proxy.web.app/api/create_n_get",
+            authToken: "eyJhbGciOiJSUzI1NiIsImtpZCI6IjRiMTFjYjdhYjVmY2JlNDFlOTQ4MDk0ZTlkZjRjNWI1ZWNhMDAwOWUiLCJ0eXAiOiJKV1QifQ.eyJuYW1lIjoiWGlueWkgTGkiLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUNnOG9jSkdnRlVVcU1hNk13Zkg3bVhZdEpRXzZWM0VsZ3B1TjJkWWoyYkFuZU9taFphNXZnPXM5Ni1jIiwiaXNzIjoiaHR0cHM6Ly9zZWN1cmV0b2tlbi5nb29nbGUuY29tL2l0cC1pbWEtcmVwbGljYXRlLXByb3h5IiwiYXVkIjoiaXRwLWltYS1yZXBsaWNhdGUtcHJveHkiLCJhdXRoX3RpbWUiOjE3NzAxODI0NzMsInVzZXJfaWQiOiJCR2hMaFgwc2pKWjdjbGU2ajZFTjFVUWNBNjEzIiwic3ViIjoiQkdoTGhYMHNqSlo3Y2xlNmo2RU4xVVFjQTYxMyIsImlhdCI6MTc3MDE4MjQ3MywiZXhwIjoxNzcwMTg2MDczLCJlbWFpbCI6InhsNTQ4MEBueXUuZWR1IiwiZW1haWxfdmVyaWZpZWQiOnRydWUsImZpcmViYXNlIjp7ImlkZW50aXRpZXMiOnsiZ29vZ2xlLmNvbSI6WyIxMDI2MTA2NTg5NzI0MjQ5NzE4NDMiXSwiZW1haWwiOlsieGw1NDgwQG55dS5lZHUiXX0sInNpZ25faW5fcHJvdmlkZXIiOiJnb29nbGUuY29tIn19.LPbPlMQL0Y6kO10PN2Q8EJXj95vjhIGAPJXcB2bUZGA45L9IpSog0VxN5e9d562By8d1gWSjFvyJDw44_ofJm4msZqMWzuZWpC16m6DF0wfNuoYr_7Kcr1HG3qmudAuxRzhluAVKM9Uh3mbiFQoauAvH7r9XdSAGY1qMHQL9zXIBCIiKIYu5dOXN1vTx6StrSitmndPuC1MdzJiW3NDJNiMBKLV7EUojUfUej2eyetZxcQJdpZEd6_iVexTf2mNClfKAjJNOPpqzWUlFWkspcBcx14R9SYcOzsHrVytIwHD4r3YI7xdNg4GOShLZ3pgwCbKHMm9Jg1eHOU_VYRWOIw",
+            blipModel: "salesforce/blip:2e1dddc8621f72155f24cf2e0adbde548458d3cab9f00c0139eea840d0ac4746",
+            frameInterval: 3, // Extract frame every 3 seconds
+            maxVideoDuration: 600, // 10 minutes in seconds
+            sceneChangeThreshold: 0.3 // Similarity threshold for scene detection
+        };
+
+        // Global state
+        let selectedVideoFile = null;
+        let extractedFrames = [];
+        let sceneFrames = [];
+
+        // DOM Elements
+        const videoInput = document.getElementById('videoInput');
+        const processBtn = document.getElementById('processBtn');
+        const uploadBox = document.getElementById('uploadBox');
+        const statusSection = document.getElementById('statusSection');
+        const statusText = document.getElementById('statusText');
+        const progressFill = document.getElementById('progressFill');
+        const controlsSection = document.getElementById('controlsSection');
+        const storyboardContainer = document.getElementById('storyboardContainer');
+        const storyboardGrid = document.getElementById('storyboardGrid');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const modal = document.getElementById('modal');
+        const modalClose = document.getElementById('modalClose');
+        const modalImage = document.getElementById('modalImage');
+        const modalInfo = document.getElementById('modalInfo');
+
+        // Event Listeners
+        videoInput.addEventListener('change', handleVideoSelect);
+        processBtn.addEventListener('click', processVideo);
+        downloadBtn.addEventListener('click', downloadStoryboard);
+        resetBtn.addEventListener('click', resetApp);
+        modalClose.addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
+
+        // Handle video selection
+        function handleVideoSelect(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            selectedVideoFile = file;
+            processBtn.disabled = false;
+            uploadBox.style.background = '#222';
+            uploadBox.querySelector('label p:first-child').textContent = '✓';
+            uploadBox.querySelector('label p:nth-child(2)').textContent = `Selected: ${file.name}`;
+        }
+
+        // Update status
+        function updateStatus(message, progress = null) {
+            statusText.textContent = message;
+            if (progress !== null) {
+                progressFill.style.width = `${progress}%`;
+            }
+        }
+
+        // Extract frames from video using HTML5 Video API
+        async function extractFrames(videoFile) {
+            return new Promise((resolve, reject) => {
+                updateStatus('Loading video...', 10);
+                
+                const video = document.createElement('video');
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                video.preload = 'metadata';
+                video.src = URL.createObjectURL(videoFile);
+                
+                video.addEventListener('loadedmetadata', async () => {
+                    const duration = video.duration;
+                    
+                    if (duration > CONFIG.maxVideoDuration) {
+                        reject(new Error(`Video too long. Max ${CONFIG.maxVideoDuration / 60} minutes.`));
+                        return;
+                    }
+                    
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    
+                    const frames = [];
+                    const totalFrames = Math.floor(duration / CONFIG.frameInterval);
+                    
+                    updateStatus(`Extracting ${totalFrames} frames...`, 15);
+                    
+                    for (let i = 0; i <= totalFrames; i++) {
+                        const timestamp = i * CONFIG.frameInterval;
+                        
+                        // Seek to timestamp
+                        video.currentTime = timestamp;
+                        
+                        // Wait for seek to complete
+                        await new Promise(seekResolve => {
+                            video.addEventListener('seeked', function onSeeked() {
+                                video.removeEventListener('seeked', onSeeked);
+                                
+                                // Draw frame to canvas
+                                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                                
+                                // Convert to data URL
+                                const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+                                
+                                frames.push({
+                                    index: i,
+                                    timestamp: timestamp,
+                                    dataUrl: dataUrl,
+                                    caption: null
+                                });
+                                
+                                const progress = 15 + (i / totalFrames) * 10;
+                                updateStatus(`Extracted frame ${i + 1}/${totalFrames + 1}`, progress);
+                                
+                                seekResolve();
+                            });
+                        });
+                    }
+                    
+                    URL.revokeObjectURL(video.src);
+                    resolve(frames);
+                });
+                
+                video.addEventListener('error', () => {
+                    reject(new Error('Failed to load video'));
+                });
+            });
+        }
+
+        // Get caption from Replicate BLIP model
+        async function getCaptionFromReplicate(imageDataUrl) {
+            const data = {
+                version: CONFIG.blipModel.split(':')[1],
+                input: {
+                    image: imageDataUrl,
+                    task: "image_captioning"
+                }
+            };
+
+            const fetchOptions = {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    'Authorization': `Bearer ${CONFIG.authToken}`,
+                },
+                body: JSON.stringify(data),
+            };
+
+            try {
+                const response = await fetch(CONFIG.replicateProxy, fetchOptions);
+                const prediction = await response.json();
+                
+                if (prediction.output) {
+                    return prediction.output;
+                } else if (prediction.error) {
+                    throw new Error(prediction.error);
+                }
+                return "No caption available";
+            } catch (error) {
+                console.error('Replicate API error:', error);
+                return "Error getting caption";
+            }
+        }
+
+        // Calculate caption similarity (simple word overlap)
+        function calculateCaptionSimilarity(caption1, caption2) {
+            if (!caption1 || !caption2) return 0;
+            
+            const words1 = caption1.toLowerCase().split(/\s+/);
+            const words2 = caption2.toLowerCase().split(/\s+/);
+            
+            const set1 = new Set(words1);
+            const set2 = new Set(words2);
+            
+            const intersection = new Set([...set1].filter(x => set2.has(x)));
+            const union = new Set([...set1, ...set2]);
+            
+            return intersection.size / union.size; // Jaccard similarity
+        }
+
+        // Analyze frames and detect scenes
+        async function analyzeFramesAndDetectScenes(frames) {
+            updateStatus('Analyzing frames with AI...', 30);
+            
+            // Get captions for all frames
+            for (let i = 0; i < frames.length; i++) {
+                const caption = await getCaptionFromReplicate(frames[i].dataUrl);
+                frames[i].caption = caption;
+                
+                const progress = 30 + (i / frames.length) * 40;
+                updateStatus(`Analyzing frame ${i + 1}/${frames.length}: "${caption}"`, progress);
+                
+                // Small delay to avoid rate limiting
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            updateStatus('Detecting scene changes...', 70);
+            
+            // Detect scene changes
+            const scenes = [frames[0]]; // Always include first frame
+            
+            for (let i = 1; i < frames.length; i++) {
+                const similarity = calculateCaptionSimilarity(
+                    frames[i - 1].caption,
+                    frames[i].caption
+                );
+                
+                // If similarity is low, it's likely a scene change
+                if (similarity < CONFIG.sceneChangeThreshold) {
+                    scenes.push(frames[i]);
+                    console.log(`Scene change detected at frame ${i}: "${frames[i].caption}"`);
+                }
+            }
+            
+            updateStatus(`Detected ${scenes.length} unique scenes`, 80);
+            return scenes;
+        }
+
+        // Display storyboard
+        function displayStoryboard(scenes) {
+            updateStatus('Creating storyboard...', 90);
+            
+            storyboardGrid.innerHTML = '';
+            
+            scenes.forEach((frame, index) => {
+                const card = document.createElement('div');
+                card.className = 'frame-card';
+                
+                const img = document.createElement('img');
+                img.src = frame.dataUrl;
+                img.alt = `Scene ${index + 1}`;
+                
+                const info = document.createElement('div');
+                info.className = 'frame-info';
+                info.innerHTML = `
+                    <div class="scene-number">SCENE ${index + 1}</div>
+                    <div>Time: ${formatTime(frame.timestamp)}</div>
+                    <div style="margin-top: 5px; font-size: 0.85rem;">${frame.caption}</div>
+                `;
+                
+                card.appendChild(img);
+                card.appendChild(info);
+                
+                card.addEventListener('click', () => openModal(frame, index));
+                
+                storyboardGrid.appendChild(card);
+            });
+            
+            storyboardContainer.classList.remove('hidden');
+            controlsSection.classList.remove('hidden');
+            statusSection.classList.add('hidden');
+            
+            updateStatus('Storyboard complete!', 100);
+        }
+
+        // Format time (seconds to MM:SS)
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        // Open modal
+        function openModal(frame, index) {
+            modalImage.src = frame.dataUrl;
+            modalInfo.innerHTML = `
+                <strong>SCENE ${index + 1}</strong> | Time: ${formatTime(frame.timestamp)}<br>
+                ${frame.caption}
+            `;
+            modal.classList.add('active');
+        }
+
+        // Close modal
+        function closeModal() {
+            modal.classList.remove('active');
+        }
+
+        // Download storyboard
+        async function downloadStoryboard() {
+            updateStatus('Preparing download...', 0);
+            statusSection.classList.remove('hidden');
+            
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Calculate grid dimensions
+            const cols = 3;
+            const rows = Math.ceil(sceneFrames.length / cols);
+            const frameWidth = 400;
+            const frameHeight = 300;
+            const padding = 20;
+            const textHeight = 60;
+            
+            canvas.width = (frameWidth + padding) * cols + padding;
+            canvas.height = (frameHeight + textHeight + padding) * rows + padding;
+            
+            // White background
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw frames
+            for (let i = 0; i < sceneFrames.length; i++) {
+                const col = i % cols;
+                const row = Math.floor(i / cols);
+                const x = padding + col * (frameWidth + padding);
+                const y = padding + row * (frameHeight + textHeight + padding);
+                
+                // Draw frame
+                const img = new Image();
+                img.src = sceneFrames[i].dataUrl;
+                await new Promise(resolve => {
+                    img.onload = () => {
+                        ctx.drawImage(img, x, y, frameWidth, frameHeight);
+                        
+                        // Draw text
+                        ctx.fillStyle = '#000000';
+                        ctx.font = 'bold 16px "Courier New"';
+                        ctx.fillText(`SCENE ${i + 1} | ${formatTime(sceneFrames[i].timestamp)}`, x, y + frameHeight + 25);
+                        
+                        ctx.font = '12px "Courier New"';
+                        const caption = sceneFrames[i].caption.substring(0, 50);
+                        ctx.fillText(caption, x, y + frameHeight + 45);
+                        
+                        resolve();
+                    };
+                });
+                
+                updateStatus(`Rendering scene ${i + 1}/${sceneFrames.length}...`, (i / sceneFrames.length) * 100);
+            }
+            
+            // Download
+            canvas.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `storyboard-${Date.now()}.png`;
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                statusSection.classList.add('hidden');
+            });
+        }
+
+        // Reset app
+        function resetApp() {
+            selectedVideoFile = null;
+            extractedFrames = [];
+            sceneFrames = [];
+            
+            videoInput.value = '';
+            processBtn.disabled = true;
+            uploadBox.style.background = '';
+            uploadBox.querySelector('label p:first-child').textContent = '📹';
+            uploadBox.querySelector('label p:nth-child(2)').textContent = 'CLICK TO UPLOAD VIDEO';
+            
+            storyboardContainer.classList.add('hidden');
+            controlsSection.classList.add('hidden');
+            statusSection.classList.add('hidden');
+            
+            storyboardGrid.innerHTML = '';
+        }
+
+        // Main process function
+        async function processVideo() {
+            if (!selectedVideoFile) return;
+            
+            try {
+                processBtn.disabled = true;
+                statusSection.classList.remove('hidden');
+                
+                // Extract frames using HTML5 Video API
+                extractedFrames = await extractFrames(selectedVideoFile);
+                
+                // Analyze and detect scenes
+                sceneFrames = await analyzeFramesAndDetectScenes(extractedFrames);
+                
+                // Display storyboard
+                displayStoryboard(sceneFrames);
+                
+            } catch (error) {
+                console.error('Error processing video:', error);
+                statusText.innerHTML = `<div class="error">ERROR: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>

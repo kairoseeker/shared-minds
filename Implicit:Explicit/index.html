@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Puzzle Generator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.1/p5.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="header">
+        <h1>AI PUZZLE GAME</h1>
+        <p>Transform yourself with AI magic, then solve the puzzle!</p>
+    </div>
+
+    <div id="controls">
+        <input type="text" id="promptInput" placeholder="Enter transformation style (e.g., 'fairy princess', 'cyberpunk warrior')">
+        <button id="generateBtn">GENERATE PUZZLE</button>
+        <button id="saveBtn" style="display: none;">SAVE IMAGE</button>
+        <button id="newPuzzleBtn" style="display: none;">NEW PUZZLE</button>
+    </div>
+
+    <div id="status"></div>
+
+    <script>
+        // Configuration
+        const CONFIG = {
+            replicateProxy: "https://itp-ima-replicate-proxy.web.app/api/create_n_get",
+            authToken: "eyJhbGciOiJSUzI1NiIsImtpZCI6IjRiMTFjYjdhYjVmY2JlNDFlOTQ4MDk0ZTlkZjRjNWI1ZWNhMDAwOWUiLCJ0eXAiOiJKV1QifQ.eyJuYW1lIjoiWGlueWkgTGkiLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUNnOG9jSkdnRlVVcU1hNk13Zkg3bVhZdEpRXzZWM0VsZ3B1TjJkWWoyYkFuZU9taFphNXZnPXM5Ni1jIiwiaXNzIjoiaHR0cHM6Ly9zZWN1cmV0b2tlbi5nb29nbGUuY29tL2l0cC1pbWEtcmVwbGljYXRlLXByb3h5IiwiYXVkIjoiaXRwLWltYS1yZXBsaWNhdGUtcHJveHkiLCJhdXRoX3RpbWUiOjE3NzAxODI0NzMsInVzZXJfaWQiOiJCR2hMaFgwc2pKWjdjbGU2ajZFTjFVUWNBNjEzIiwic3ViIjoiQkdoTGhYMHNqSlo3Y2xlNmo2RU4xVVFjQTYxMyIsImlhdCI6MTc3MDE4MjQ3MywiZXhwIjoxNzcwMTg2MDczLCJlbWFpbCI6InhsNTQ4MEBueXUuZWR1IiwiZW1haWxfdmVyaWZpZWQiOnRydWUsImZpcmViYXNlIjp7ImlkZW50aXRpZXMiOnsiZ29vZ2xlLmNvbSI6WyIxMDI2MTA2NTg5NzI0MjQ5NzE4NDMiXSwiZW1haWwiOlsieGw1NDgwQG55dS5lZHUiXX0sInNpZ25faW5fcHJvdmlkZXIiOiJnb29nbGUuY29tIn19.LPbPlMQL0Y6kO10PN2Q8EJXj95vjhIGAPJXcB2bUZGA45L9IpSog0VxN5e9d562By8d1gWSjFvyJDw44_ofJm4msZqMWzuZWpC16m6DF0wfNuoYr_7Kcr1HG3qmudAuxRzhluAVKM9Uh3mbiFQoauAvH7r9XdSAGY1qMHQL9zXIBCIiKIYu5dOXN1vTx6StrSitmndPuC1MdzJiW3NDJNiMBKLV7EUojUfUej2eyetZxcQJdpZEd6_iVexTf2mNClfKAjJNOPpqzWUlFWkspcBcx14R9SYcOzsHrVytIwHD4r3YI7xdNg4GOShLZ3pgwCbKHMm9Jg1eHOU_VYRWOIw",
+            model: "google/nano-banana",
+            gridSize: 5, // 5x5 = 25 pieces
+            canvasWidth: 640,
+            canvasHeight: 640
+        };
+
+        // Global state
+        let video;
+        let generatedImage = null;
+        let puzzlePieces = [];
+        let draggedPiece = null;
+        let gameState = 'webcam'; // 'webcam', 'generating', 'puzzle', 'complete'
+        let pieceSize;
+
+        // p5.js setup
+        function setup() {
+            let canvas = createCanvas(CONFIG.canvasWidth, CONFIG.canvasHeight);
+            canvas.parent(document.body);
+            
+            pieceSize = CONFIG.canvasWidth / CONFIG.gridSize;
+            
+            // Start webcam
+            video = createCapture(VIDEO);
+            video.size(CONFIG.canvasWidth, CONFIG.canvasHeight);
+            video.hide();
+            
+            // Button listeners
+            document.getElementById('generateBtn').addEventListener('click', generatePuzzle);
+            document.getElementById('saveBtn').addEventListener('click', saveImage);
+            document.getElementById('newPuzzleBtn').addEventListener('click', resetGame);
+        }
+
+        // p5.js draw loop
+        function draw() {
+            background(0);
+            
+            if (gameState === 'webcam') {
+                // Show live webcam feed
+                if (video) {
+                    image(video, 0, 0, width, height);
+                }
+                
+                // Draw overlay instructions
+                fill(255, 255, 255, 230);
+                noStroke();
+                rect(0, height - 80, width, 80);
+                fill(102, 126, 234);
+                textAlign(CENTER, CENTER);
+                textSize(20);
+                textStyle(BOLD);
+                text('Type a fun prompt above!', width/2, height - 50);
+                textSize(16);
+                textStyle(NORMAL);
+                fill(74, 85, 104);
+                text('Try: "superhero", "zombie", "medieval knight"', width/2, height - 25);
+                
+            } else if (gameState === 'generating') {
+                // Show loading state with animation
+                fill(255);
+                textAlign(CENTER, CENTER);
+                textSize(32);
+                textStyle(BOLD);
+                let dots = '.'.repeat((frameCount / 20) % 4);
+                text('Making magic' + dots, width/2, height/2 - 20);
+                textSize(18);
+                textStyle(NORMAL);
+                text('(this might take 10-30 seconds)', width/2, height/2 + 20);
+                
+            } else if (gameState === 'puzzle' || gameState === 'complete') {
+                // Draw puzzle pieces
+                for (let piece of puzzlePieces) {
+                    push();
+                    translate(piece.x, piece.y);
+                    
+                    // Draw piece
+                    image(
+                        generatedImage,
+                        0, 0,
+                        pieceSize, pieceSize,
+                        piece.correctCol * pieceSize,
+                        piece.correctRow * pieceSize,
+                        pieceSize, pieceSize
+                    );
+                    
+                    // Draw border
+                    noFill();
+                    if (piece.snapped) {
+                        stroke(72, 187, 120); // Green for snapped pieces
+                        strokeWeight(3);
+                    } else {
+                        stroke(45, 55, 72);
+                        strokeWeight(2);
+                    }
+                    rect(0, 0, pieceSize, pieceSize);
+                    
+                    // Highlight if being dragged
+                    if (piece === draggedPiece) {
+                        stroke(255, 215, 61);
+                        strokeWeight(5);
+                        rect(-2, -2, pieceSize + 4, pieceSize + 4);
+                    }
+                    
+                    pop();
+                }
+                
+                // Check if puzzle is complete
+                if (gameState === 'puzzle' && isPuzzleComplete()) {
+                    gameState = 'complete';
+                    showCompleteMessage();
+                }
+                
+                // Draw completion overlay
+                if (gameState === 'complete') {
+                    fill(102, 126, 234, 230);
+                    rect(0, 0, width, height);
+                    
+                    // Animated confetti circles
+                    for (let i = 0; i < 30; i++) {
+                        let x = random(width);
+                        let y = random(height);
+                        let size = random(10, 30);
+                        let colors = [
+                            [255, 215, 61],
+                            [72, 187, 120],
+                            [237, 137, 54],
+                            [66, 153, 225],
+                            [245, 101, 101]
+                        ];
+                        let col = random(colors);
+                        fill(col[0], col[1], col[2], random(150, 255));
+                        noStroke();
+                        ellipse(x, y, size, size);
+                    }
+                    
+                    fill(255);
+                    textAlign(CENTER, CENTER);
+                    textSize(56);
+                    textStyle(BOLD);
+                    text('YOU DID IT!', width/2, height/2 - 30);
+                    textSize(24);
+                    textStyle(NORMAL);
+                    text('Click below to save or play again!', width/2, height/2 + 40);
+                }
+            }
+        }
+
+        // Mouse interactions for drag and drop
+        function mousePressed() {
+            if (gameState !== 'puzzle' && gameState !== 'complete') return;
+            
+            // Find which piece was clicked
+            for (let i = puzzlePieces.length - 1; i >= 0; i--) {
+                let piece = puzzlePieces[i];
+                if (mouseX >= piece.x && mouseX <= piece.x + pieceSize &&
+                    mouseY >= piece.y && mouseY <= piece.y + pieceSize) {
+                    draggedPiece = piece;
+                    piece.offsetX = mouseX - piece.x;
+                    piece.offsetY = mouseY - piece.y;
+                    
+                    // Move to end of array (draw on top)
+                    puzzlePieces.splice(i, 1);
+                    puzzlePieces.push(piece);
+                    break;
+                }
+            }
+        }
+
+        function mouseDragged() {
+            if (draggedPiece) {
+                draggedPiece.x = mouseX - draggedPiece.offsetX;
+                draggedPiece.y = mouseY - draggedPiece.offsetY;
+            }
+        }
+
+        function mouseReleased() {
+            if (draggedPiece) {
+                // Snap to grid if close to correct position
+                let correctX = draggedPiece.correctCol * pieceSize;
+                let correctY = draggedPiece.correctRow * pieceSize;
+                
+                let distance = dist(draggedPiece.x, draggedPiece.y, correctX, correctY);
+                
+                if (distance < pieceSize / 2) {
+                    draggedPiece.x = correctX;
+                    draggedPiece.y = correctY;
+                    draggedPiece.snapped = true;
+                }
+                
+                draggedPiece = null;
+            }
+        }
+
+        // Generate puzzle from webcam
+        async function generatePuzzle() {
+            const prompt = document.getElementById('promptInput').value.trim();
+            
+            if (!prompt) {
+                updateStatus('Oops! You need to enter a prompt first!');
+                return;
+            }
+            
+            gameState = 'generating';
+            updateStatus('Say cheese! Capturing your webcam...');
+            
+            try {
+                // Capture current webcam frame
+                video.loadPixels();
+                let imgBase64 = get(0, 0, width, height).canvas.toDataURL();
+                
+                updateStatus('Sending to the AI wizard...');
+                
+                // Send to Replicate
+                const postData = {
+                    model: CONFIG.model,
+                    input: {
+                        prompt: prompt,
+                        image_input: [imgBase64],
+                        output_format: "png",
+                    },
+                };
+                
+                const options = {
+                    headers: {
+                        "Content-Type": "application/json",
+                        'Authorization': `Bearer ${CONFIG.authToken}`,
+                    },
+                    method: "POST",
+                    body: JSON.stringify(postData),
+                };
+                
+                console.log("Requesting image generation...");
+                const response = await fetch(CONFIG.replicateProxy, options);
+                const result = await response.json();
+                
+                console.log("Result:", result);
+                
+                if (result.output) {
+                    updateStatus('AI magic complete! Loading your masterpiece...');
+                    
+                    // Load the generated image
+                    loadImage(result.output, (img) => {
+                        generatedImage = img;
+                        createPuzzlePieces();
+                        gameState = 'puzzle';
+                        updateStatus('Drag the pieces to solve the puzzle!');
+                        
+                        // Hide generate button, show save/new buttons
+                        document.getElementById('generateBtn').style.display = 'none';
+                        document.getElementById('saveBtn').style.display = 'inline-block';
+                        document.getElementById('newPuzzleBtn').style.display = 'inline-block';
+                    });
+                } else {
+                    throw new Error(result.error || 'Failed to generate image');
+                }
+                
+            } catch (error) {
+                console.error('Error:', error);
+                updateStatus('Uh oh! Something went wrong: ' + error.message);
+                gameState = 'webcam';
+            }
+        }
+
+        // Create puzzle pieces
+        function createPuzzlePieces() {
+            puzzlePieces = [];
+            
+            // Create pieces with correct positions
+            for (let row = 0; row < CONFIG.gridSize; row++) {
+                for (let col = 0; col < CONFIG.gridSize; col++) {
+                    puzzlePieces.push({
+                        correctRow: row,
+                        correctCol: col,
+                        x: col * pieceSize,
+                        y: row * pieceSize,
+                        offsetX: 0,
+                        offsetY: 0,
+                        snapped: false
+                    });
+                }
+            }
+            
+            // Scramble pieces
+            scramblePieces();
+        }
+
+        // Scramble puzzle pieces
+        function scramblePieces() {
+            for (let piece of puzzlePieces) {
+                // Random position within canvas
+                piece.x = random(0, width - pieceSize);
+                piece.y = random(0, height - pieceSize);
+                piece.snapped = false;
+            }
+        }
+
+        // Check if puzzle is complete
+        function isPuzzleComplete() {
+            for (let piece of puzzlePieces) {
+                let correctX = piece.correctCol * pieceSize;
+                let correctY = piece.correctRow * pieceSize;
+                
+                // Check if piece is in correct position (with small tolerance)
+                if (abs(piece.x - correctX) > 5 || abs(piece.y - correctY) > 5) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // Show completion message
+        function showCompleteMessage() {
+            updateStatus('Amazing! You solved it! Save your creation or try again!');
+        }
+
+        // Save completed image
+        function saveImage() {
+            if (!generatedImage) return;
+            
+            // Create a clean version without puzzle borders
+            let cleanCanvas = createGraphics(CONFIG.canvasWidth, CONFIG.canvasHeight);
+            cleanCanvas.image(generatedImage, 0, 0);
+            
+            // Download
+            saveCanvas(cleanCanvas, 'ai-puzzle-' + Date.now(), 'png');
+            updateStatus('Image saved! Check your downloads!');
+        }
+
+        // Reset game
+        function resetGame() {
+            gameState = 'webcam';
+            generatedImage = null;
+            puzzlePieces = [];
+            
+            document.getElementById('promptInput').value = '';
+            document.getElementById('generateBtn').style.display = 'inline-block';
+            document.getElementById('saveBtn').style.display = 'none';
+            document.getElementById('newPuzzleBtn').style.display = 'none';
+            
+            updateStatus('');
+        }
+
+        // Update status message
+        function updateStatus(message) {
+            document.getElementById('status').textContent = message;
+        }
+    </script>
+</body>
+</html>

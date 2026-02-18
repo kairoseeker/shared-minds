@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SoundSpace - Explore Music Similarities</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Circular', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+            background: linear-gradient(180deg, #121212 0%, #0a0a0a 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .search-section {
+            padding: 20px;
+            background: rgba(18, 18, 18, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .search-bar {
+            display: flex;
+            align-items: center;
+            background: #282828;
+            border-radius: 24px;
+            padding: 4px 8px 4px 16px;
+            gap: 12px;
+            max-width: 800px;
+            width: 100%;
+            transition: background 0.2s;
+        }
+
+        .search-bar:focus-within {
+            background: #3e3e3e;
+        }
+
+        .search-icon {
+            color: #b3b3b3;
+            flex-shrink: 0;
+        }
+
+        #searchInput {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #ffffff;
+            font-size: 0.95rem;
+            padding: 12px 8px;
+        }
+
+        #searchInput::placeholder {
+            color: #6a6a6a;
+        }
+
+        .search-button {
+            background: #1DB954;
+            color: #000000;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .search-button:hover {
+            background: #1ed760;
+            transform: scale(1.04);
+        }
+
+        .search-button:active {
+            transform: scale(0.96);
+        }
+
+        .search-status {
+            margin-top: 12px;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        .search-status.info {
+            background: rgba(29, 185, 84, 0.1);
+            color: #1DB954;
+        }
+
+        .search-status.success {
+            background: rgba(29, 185, 84, 0.2);
+            color: #1ed760;
+        }
+
+        .search-status.error {
+            background: rgba(255, 59, 48, 0.1);
+            color: #ff3b30;
+        }
+
+        .map-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background: #0a0a0a;
+        }
+
+        .map-info {
+            position: absolute;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            background: rgba(40, 40, 40, 0.9);
+            backdrop-filter: blur(10px);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            color: #b3b3b3;
+        }
+
+        .map {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            cursor: grab;
+        }
+
+        .map:active {
+            cursor: grabbing;
+        }
+
+        .song-card {
+            position: absolute;
+            width: 120px;
+            background: #181818;
+            border-radius: 8px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease, transform 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        }
+
+        .zoom-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 100;
+        }
+
+        .zoom-btn {
+            width: 40px;
+            height: 40px;
+            background: #282828;
+            color: #fff;
+            border: none;
+            border-radius: 50%;
+            font-size: 24px;
+            font-weight: 300;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .zoom-btn:hover {
+            background: #1DB954;
+            transform: scale(1.1);
+        }
+
+        .song-card:hover {
+            background: #282828;
+            transform: translateY(-4px) scale(1.05);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+            z-index: 100;
+        }
+
+        .song-card.user-added {
+            border: 2px solid #1DB954;
+            box-shadow: 0 4px 16px rgba(29, 185, 84, 0.3);
+        }
+
+        .song-card.user-added:hover {
+            box-shadow: 0 8px 32px rgba(29, 185, 84, 0.5);
+        }
+
+        .album-cover {
+            width: 100%;
+            aspect-ratio: 1;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 10px;
+            background: #282828;
+        }
+
+        .album-cover img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .song-info {
+            text-align: left;
+        }
+
+        .song-name {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 4px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .artist-name {
+            font-size: 0.75rem;
+            color: #b3b3b3;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        @media (max-width: 768px) {
+            .search-section {
+                padding: 16px 20px;
+            }
+            
+            .search-bar {
+                flex-wrap: wrap;
+            }
+            
+            .search-button {
+                width: 100%;
+                margin-top: 8px;
+            }
+            
+            .song-card {
+                width: 100px;
+                padding: 8px;
+            }
+            
+            .song-name {
+                font-size: 0.75rem;
+            }
+            
+            .artist-name {
+                font-size: 0.7rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="search-section">
+            <div class="search-bar">
+                <svg class="search-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                    <circle cx="9" cy="9" r="7" stroke="currentColor" stroke-width="2"/>
+                    <path d="M14 14L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                <input 
+                    type="text" 
+                    id="searchInput" 
+                    placeholder="Add a song... (e.g., 'Starboy - The Weeknd')"
+                >
+                <button id="searchBtn" class="search-button">Add to Map</button>
+            </div>
+            <div id="searchStatus" class="search-status"></div>
+        </div>
+
+        <div class="map-container" id="mapContainer">
+            <div class="map-info">
+                <p>Similar songs are positioned closer together • Add songs to explore the space</p>
+            </div>
+            <div id="map" class="map"></div>
+            <div class="zoom-controls">
+                <button id="zoomIn" class="zoom-btn">+</button>
+                <button id="zoomOut" class="zoom-btn">−</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const PRELOADED_SONGS = {
+            songs: [
+                {
+                    name: "Blinding Lights",
+                    artist: "The Weeknd",
+                    spotifyUri: "spotify:track:0VjIjW4GlUZAMYd2vXMi3b",
+                    x: 0.25,
+                    y: 0.15
+                },
+                {
+                    name: "Flowers",
+                    artist: "Miley Cyrus",
+                    spotifyUri: "spotify:track:0yLdNVWF3Srea0uzk55zFn",
+                    x: 0.40,
+                    y: 0.20
+                },
+                {
+                    name: "Anti-Hero",
+                    artist: "Taylor Swift",
+                    spotifyUri: "spotify:track:0V3wPSX9ygBnCm8psDIegu",
+                    x: 0.32,
+                    y: 0.28
+                },
+                {
+                    name: "HUMBLE.",
+                    artist: "Kendrick Lamar",
+                    spotifyUri: "spotify:track:7KXjTSCq5nL1LoYtL7XAwS",
+                    x: 0.08,
+                    y: 0.85
+                },
+                {
+                    name: "God's Plan",
+                    artist: "Drake",
+                    spotifyUri: "spotify:track:6DCZcSspjsKoFjzjrWoCdn",
+                    x: 0.15,
+                    y: 0.92
+                },
+                {
+                    name: "Bohemian Rhapsody",
+                    artist: "Queen",
+                    spotifyUri: "spotify:track:3z8h0TU7ReDPLIbEnYhWZb",
+                    x: 0.88,
+                    y: 0.08
+                },
+                {
+                    name: "Mr. Brightside",
+                    artist: "The Killers",
+                    spotifyUri: "spotify:track:003vvx7Niy0yvhvHt4a68B",
+                    x: 0.80,
+                    y: 0.15
+                },
+                {
+                    name: "Levels",
+                    artist: "Avicii",
+                    spotifyUri: "spotify:track:5nTtCOCds6I0PHMNtqelas",
+                    x: 0.92,
+                    y: 0.60
+                },
+                {
+                    name: "Titanium",
+                    artist: "David Guetta",
+                    spotifyUri: "spotify:track:0DrWg8JdeFzoCNJTI8MgkS",
+                    x: 0.85,
+                    y: 0.68
+                },
+                {
+                    name: "Take Me to Church",
+                    artist: "Hozier",
+                    spotifyUri: "spotify:track:1CS7Sd1u5tWkstBhpssyjP",
+                    x: 0.18,
+                    y: 0.12
+                },
+                {
+                    name: "Despacito",
+                    artist: "Luis Fonsi",
+                    spotifyUri: "spotify:track:6rPO02ozF3bM7NnOV4h6s2",
+                    x: 0.62,
+                    y: 0.90
+                },
+                {
+                    name: "Enter Sandman",
+                    artist: "Metallica",
+                    spotifyUri: "spotify:track:1hKdDCpiI9mqz1jVHRKG0E",
+                    x: 0.05,
+                    y: 0.05
+                }
+            ]
+        };
+
+        let allSongs = [];
+        let panX = 0;
+        let panY = 0;
+        let scale = 1;
+        let isDragging = false;
+        let dragStartX = 0;
+        let dragStartY = 0;
+        let isZooming = false;
+
+        async function init() {
+            allSongs = [];
+            
+            showStatus('Loading album covers...', 'info');
+            
+            for (let song of PRELOADED_SONGS.songs) {
+                const cover = await getAlbumCover(song.name, song.artist);
+                allSongs.push({
+                    ...song,
+                    cover: cover,
+                    isUserAdded: false
+                });
+            }
+            
+            const userSongs = localStorage.getItem('soundspace_user_songs');
+            if (userSongs) {
+                try {
+                    const parsed = JSON.parse(userSongs);
+                    allSongs = [...allSongs, ...parsed];
+                } catch (e) {
+                    console.error('Error loading user songs:', e);
+                }
+            }
+            
+            setupPanZoom();
+            renderMap();
+            showStatus('', 'info');
+        }
+
+        async function getAlbumCover(songName, artistName) {
+            try {
+                const searchUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(songName + ' ' + artistName)}&media=music&entity=song&limit=1`;
+                const response = await fetch(searchUrl);
+                const data = await response.json();
+                
+                if (data.resultCount > 0 && data.results[0].artworkUrl100) {
+                    return data.results[0].artworkUrl100.replace('100x100', '600x600');
+                }
+                
+                return generateFallbackSVG(songName);
+            } catch (error) {
+                console.error('Error fetching album cover:', error);
+                return generateFallbackSVG(songName);
+            }
+        }
+
+        function generateFallbackSVG(songName) {
+            const colors = ['#FF6B35', '#1DB954', '#9B59B6', '#E74C3C', '#3498DB', '#F39C12', '#E67E22', '#1ABC9C', '#16A085', '#34495E', '#E91E63', '#2C3E50'];
+            const colorIndex = songName.charCodeAt(0) % colors.length;
+            const color = colors[colorIndex];
+            
+            return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Crect fill='${color.replace('#', '%23')}' width='300' height='300'/%3E%3Ctext x='50%25' y='50%25' font-size='20' fill='white' text-anchor='middle' dy='.3em' font-family='Arial'%3E${encodeURIComponent(songName)}%3C/text%3E%3C/svg%3E`;
+        }
+
+        function setupPanZoom() {
+            const mapEl = document.getElementById('map');
+            
+            mapEl.addEventListener('mousedown', (e) => {
+                if (e.target.closest('.song-card')) return;
+                isDragging = true;
+                dragStartX = e.clientX - panX;
+                dragStartY = e.clientY - panY;
+                mapEl.style.cursor = 'grabbing';
+            });
+            
+            window.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                panX = e.clientX - dragStartX;
+                panY = e.clientY - dragStartY;
+                renderMap();
+            });
+            
+            window.addEventListener('mouseup', () => {
+                isDragging = false;
+                document.getElementById('map').style.cursor = 'grab';
+            });
+            
+            mapEl.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? 0.9 : 1.1;
+                const newScale = Math.min(Math.max(scale * delta, 0.5), 3);
+                
+                const rect = mapEl.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                
+                panX = mouseX - (mouseX - panX) * (newScale / scale);
+                panY = mouseY - (mouseY - panY) * (newScale / scale);
+                
+                scale = newScale;
+                renderMap();
+            });
+        }
+
+        function renderMap() {
+            const mapEl = document.getElementById('map');
+            mapEl.innerHTML = '';
+            
+            const container = document.getElementById('mapContainer');
+            const width = container.clientWidth;
+            const height = container.clientHeight - 40;
+            
+            allSongs.forEach(song => {
+                const card = document.createElement('div');
+                card.className = 'song-card';
+                if (song.isUserAdded) card.classList.add('user-added');
+                
+                const baseX = song.x * (width - 140) + 20;
+                const baseY = song.y * (height - 180) + 20;
+                
+                const x = baseX * scale + panX;
+                const y = baseY * scale + panY;
+                
+                card.style.left = `${x}px`;
+                card.style.top = `${y}px`;
+                card.style.transform = `scale(${scale})`;
+                card.style.transformOrigin = 'top left';
+                
+                card.innerHTML = `
+                    <div class="album-cover">
+                        <img src="${song.cover}" alt="${song.name}" onerror="this.src='${generateFallbackSVG(song.name)}'">
+                    </div>
+                    <div class="song-info">
+                        <div class="song-name">${song.name}</div>
+                        <div class="artist-name">${song.artist}</div>
+                    </div>
+                `;
+                
+                // Ensure Spotify link exists for all songs (fixes old localStorage songs)
+                const spotifyLink = song.spotifyUri || `https://open.spotify.com/search/${encodeURIComponent(song.name + ' ' + song.artist)}`;
+                
+                card.addEventListener('click', () => {
+                    window.open(spotifyLink, '_blank');
+                });
+                
+                mapEl.appendChild(card);
+            });
+        }
+
+        function smoothZoom(targetScale, duration = 300) {
+            if (isZooming) return;
+            isZooming = true;
+            
+            const container = document.getElementById('mapContainer');
+            const centerX = container.clientWidth / 2;
+            const centerY = container.clientHeight / 2;
+            
+            const startScale = scale;
+            const startPanX = panX;
+            const startPanY = panY;
+            
+            const targetPanX = centerX - (centerX - panX) * (targetScale / scale);
+            const targetPanY = centerY - (centerY - panY) * (targetScale / scale);
+            
+            const startTime = performance.now();
+            
+            function animate(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                const eased = 1 - Math.pow(1 - progress, 3);
+                
+                scale = startScale + (targetScale - startScale) * eased;
+                panX = startPanX + (targetPanX - startPanX) * eased;
+                panY = startPanY + (targetPanY - startPanY) * eased;
+                
+                renderMap();
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    isZooming = false;
+                }
+            }
+            
+            requestAnimationFrame(animate);
+        }
+
+        async function searchAndAddSong() {
+            const searchInput = document.getElementById('searchInput');
+            const query = searchInput.value.trim();
+            
+            if (!query) {
+                showStatus('Please enter a song name and artist', 'error');
+                return;
+            }
+            
+            let songName, artistName;
+            if (query.includes(' - ')) {
+                [songName, artistName] = query.split(' - ').map(s => s.trim());
+            } else if (query.toLowerCase().includes(' by ')) {
+                [songName, artistName] = query.toLowerCase().split(' by ').map(s => s.trim());
+            } else {
+                showStatus('Please use format: "Song Name - Artist"', 'error');
+                return;
+            }
+            
+            showStatus('Finding album cover...');
+            
+            try {
+                const cover = await getAlbumCover(songName, artistName);
+                
+                const x = 0.3 + Math.random() * 0.4;
+                const y = 0.3 + Math.random() * 0.4;
+                
+                // Create Spotify search URL
+                const spotifySearchUrl = `https://open.spotify.com/search/${encodeURIComponent(songName + ' ' + artistName)}`;
+                
+                const newSong = {
+                    name: songName,
+                    artist: artistName,
+                    cover: cover,
+                    x: x,
+                    y: y,
+                    isUserAdded: true,
+                    spotifyUri: spotifySearchUrl
+                };
+                
+                allSongs.push(newSong);
+                
+                const userSongs = allSongs.filter(s => s.isUserAdded);
+                localStorage.setItem('soundspace_user_songs', JSON.stringify(userSongs));
+                
+                renderMap();
+                showStatus(`Added "${songName}" to the map!`, 'success');
+                searchInput.value = '';
+                
+            } catch (error) {
+                console.error('Error adding song:', error);
+                showStatus('Error adding song. Please try again.', 'error');
+            }
+        }
+
+        function showStatus(message, type = 'info') {
+            const statusEl = document.getElementById('searchStatus');
+            statusEl.textContent = message;
+            statusEl.className = `search-status ${type}`;
+            statusEl.style.display = message ? 'block' : 'none';
+            
+            if (type === 'success' || type === 'error') {
+                setTimeout(() => {
+                    statusEl.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        document.getElementById('searchBtn').addEventListener('click', searchAndAddSong);
+        document.getElementById('searchInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') searchAndAddSong();
+        });
+        
+        document.getElementById('zoomIn').addEventListener('click', () => {
+            const targetScale = Math.min(scale * 1.3, 3);
+            smoothZoom(targetScale);
+        });
+        
+        document.getElementById('zoomOut').addEventListener('click', () => {
+            const targetScale = Math.max(scale * 0.77, 0.5);
+            smoothZoom(targetScale);
+        });
+
+        window.addEventListener('resize', renderMap);
+
+        init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Group Picture</title>
+  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800&display=swap" rel="stylesheet"/>
+</head>
+<body>
+
+  <div id="env-bar">
+    <span id="env-label">environment:</span>
+    <button class="env-btn active" data-env="beach">beach</button>
+    <button class="env-btn" data-env="classroom">classroom</button>
+    <button class="env-btn" data-env="cafe">café</button>
+  </div>
+
+  <div id="main">
+    <div id="toolbar">
+
+      <div class="tool-section">
+        <button class="tool-btn active" id="tool-pen" title="Pen">✏️</button>
+        <button class="tool-btn" id="tool-pencil" title="Pencil">🖊️</button>
+        <button class="tool-btn" id="tool-eraser" title="Eraser">⬜</button>
+      </div>
+
+      <div class="tool-section" id="color-swatches">
+        <div class="swatch active" data-color="#e63946" style="background:#e63946"></div>
+        <div class="swatch" data-color="#f4a261" style="background:#f4a261"></div>
+        <div class="swatch" data-color="#2a9d8f" style="background:#2a9d8f"></div>
+        <div class="swatch" data-color="#264653" style="background:#264653"></div>
+        <div class="swatch" data-color="#e9c46a" style="background:#e9c46a"></div>
+        <div class="swatch" data-color="#a8dadc" style="background:#a8dadc"></div>
+        <div class="swatch" data-color="#457b9d" style="background:#457b9d"></div>
+        <div class="swatch" data-color="#1d3557" style="background:#1d3557"></div>
+        <div class="swatch" data-color="#ffffff" style="background:#ffffff; border: 2px solid #ccc"></div>
+        <div class="swatch" data-color="#000000" style="background:#000000"></div>
+        <input type="color" id="custom-color" title="Custom colour" value="#ff0000"/>
+      </div>
+
+      <div class="tool-section sliders-row">
+        <div class="slider-group">
+          <label for="brush-size">size</label>
+          <input type="range" id="brush-size" min="1" max="40" value="6" />
+        </div>
+        <div class="slider-group">
+          <label for="opacity-slider">fade</label>
+          <input type="range" id="opacity-slider" min="0.1" max="1" step="0.05" value="1" />
+        </div>
+      </div>
+
+      <div class="tool-section history-btns">
+        <button class="tool-btn" id="btn-undo" title="Undo">↩</button>
+        <button class="tool-btn" id="btn-redo" title="Redo">↪</button>
+      </div>
+
+      <button id="clear-btn">clear</button>
+      <button id="save-btn">save ✓</button>
+    </div>
+
+    <div id="canvas-wrapper">
+      <canvas id="bg-canvas"></canvas>
+      <canvas id="others-canvas"></canvas>
+      <canvas id="live-canvas"></canvas>
+      <canvas id="draw-canvas"></canvas>
+      <div id="name-tooltip"></div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

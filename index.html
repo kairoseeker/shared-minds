@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>The Interpreter's Ghost</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Cormorant+Garamond:ital,wght@0,300;1,300&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ghost: rgba(160, 200, 255, 0.55);
+      --ghost-dim: rgba(120, 160, 255, 0.18);
+      --real: rgba(255, 255, 255, 0.75);
+      --real-dim: rgba(255, 255, 255, 0.2);
+      --bg: #050508;
+      --text: rgba(200, 210, 230, 0.6);
+      --accent: rgba(160, 200, 255, 0.4);
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Cormorant Garamond', serif;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    #container {
+      position: relative;
+      width: 100vw; height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Webcam feed — dark, mirrored */
+    #webcam {
+      position: absolute;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1);
+      opacity: 0.18;
+      filter: grayscale(1) brightness(0.6);
+      z-index: 0;
+    }
+
+    /* Main drawing canvas */
+    #canvas {
+      position: absolute;
+      width: 100%; height: 100%;
+      z-index: 1;
+    }
+
+    /* Vignette overlay */
+    #vignette {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at center, transparent 30%, rgba(5,5,8,0.85) 100%);
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    /* UI text layer */
+    #ui {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    #title {
+      position: absolute;
+      top: 2.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      letter-spacing: 0.35em;
+      font-family: 'IM Fell English', serif;
+      font-size: clamp(0.65rem, 1.1vw, 0.9rem);
+      text-transform: uppercase;
+      color: var(--accent);
+      opacity: 0.7;
+      white-space: nowrap;
+    }
+
+    #subtitle {
+      position: absolute;
+      top: calc(2.5rem + 1.6em);
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: clamp(0.55rem, 0.85vw, 0.72rem);
+      letter-spacing: 0.18em;
+      color: rgba(160,200,255,0.3);
+      white-space: nowrap;
+    }
+
+    #status {
+      position: absolute;
+      bottom: 2.8rem;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: clamp(0.6rem, 0.9vw, 0.75rem);
+      letter-spacing: 0.2em;
+      color: rgba(160,200,255,0.28);
+      text-align: center;
+      transition: opacity 1s ease;
+    }
+
+    #merge-msg {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: 'IM Fell English', serif;
+      font-style: italic;
+      font-size: clamp(1rem, 2.5vw, 1.8rem);
+      color: rgba(160,200,255,0.0);
+      letter-spacing: 0.15em;
+      text-align: center;
+      pointer-events: none;
+      transition: color 2.5s ease, opacity 2.5s ease;
+    }
+    #merge-msg.visible {
+      color: rgba(160,200,255,0.35);
+    }
+
+    /* Noise grain */
+    #grain {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      pointer-events: none;
+      opacity: 0.035;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-size: 128px;
+    }
+
+    #start-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1.4rem;
+      transition: opacity 1.5s ease;
+    }
+    #start-overlay.fade {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #start-title {
+      font-family: 'IM Fell English', serif;
+      font-size: clamp(1.6rem, 4vw, 3rem);
+      letter-spacing: 0.12em;
+      color: rgba(200,215,240,0.85);
+      text-align: center;
+    }
+    #start-sub {
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: clamp(0.75rem, 1.3vw, 1rem);
+      letter-spacing: 0.22em;
+      color: rgba(160,200,255,0.4);
+      text-align: center;
+      max-width: 32rem;
+      line-height: 1.9;
+      padding: 0 2rem;
+    }
+    #start-btn {
+      margin-top: 0.8rem;
+      padding: 0.65rem 2.2rem;
+      border: 1px solid rgba(160,200,255,0.25);
+      background: transparent;
+      color: rgba(160,200,255,0.55);
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: clamp(0.7rem, 1.1vw, 0.9rem);
+      letter-spacing: 0.3em;
+      cursor: pointer;
+      transition: all 0.4s ease;
+    }
+    #start-btn:hover {
+      border-color: rgba(160,200,255,0.6);
+      color: rgba(160,200,255,0.9);
+      background: rgba(160,200,255,0.04);
+    }
+  </style>
+</head>
+<body>
+
+<div id="container">
+  <video id="webcam" autoplay muted playsinline></video>
+  <canvas id="canvas"></canvas>
+  <div id="vignette"></div>
+  <div id="grain"></div>
+  <div id="ui">
+    <div id="title">The Interpreter's Ghost</div>
+    <div id="subtitle">a machine hallucinating language it cannot know</div>
+    <div id="status">raise your hands — begin</div>
+    <div id="merge-msg">it has learned your shape</div>
+  </div>
+</div>
+
+<div id="start-overlay">
+  <div id="start-title">The Interpreter's Ghost</div>
+  <div id="start-sub">
+    Your hands speak.<br>
+    Something else listens — and answers with signs<br>
+    you never made.
+  </div>
+  <button id="start-btn" onclick="startExperience()">enter</button>
+</div>
+
+<!-- Dependencies -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+let handPose, hands = [];
+let ghostHands = []; // hallucinated skeleton state per detected hand
+let videoEl, canvas, ctx;
+let audioCtx, droneOsc, droneGain, driftOsc, driftGain;
+let lastMotionTime = Date.now();
+let merging = false;
+let started = false;
+
+const FINGER_CONNECTIONS = [
+  // thumb
+  [0,1],[1,2],[2,3],[3,4],
+  // index
+  [0,5],[5,6],[6,7],[7,8],
+  // middle
+  [0,9],[9,10],[10,11],[11,12],
+  // ring
+  [0,13],[13,14],[14,15],[15,16],
+  // pinky
+  [0,17],[17,18],[18,19],[19,20],
+  // palm
+  [5,9],[9,13],[13,17]
+];
+
+// ─── Ghost logic ──────────────────────────────────────────────────────────────
+// Each ghost hand has 21 keypoints that drift toward a "target" hallucination.
+// The hallucination periodically snaps to a new invented pose.
+
+function makeGhostHand(realKps) {
+  const kps = realKps.map(k => ({
+    x: k.x + (Math.random()-0.5)*60,
+    y: k.y + (Math.random()-0.5)*60,
+    tx: k.x, ty: k.y,
+    vx: 0, vy: 0
+  }));
+  return {
+    kps,
+    nextSnapTime: Date.now() + randomBetween(1800, 4500),
+    mergeProgress: 0, // 0=apart, 1=merged
+    trailPoints: []
+  };
+}
+
+function updateGhostHand(ghost, realKps, isMerging) {
+  const now = Date.now();
+
+  // Snap to new hallucination target periodically
+  if (now > ghost.nextSnapTime && !isMerging) {
+    ghost.nextSnapTime = now + randomBetween(1800, 5000);
+    // Generate an invented hand pose by distorting real kps
+    const anchorX = realKps[0].x;
+    const anchorY = realKps[0].y;
+    const rotAngle = (Math.random()-0.5) * 1.2;
+    const scaleF = 0.7 + Math.random()*0.8;
+    ghost.kps.forEach((gk, i) => {
+      const dx = realKps[i].x - anchorX;
+      const dy = realKps[i].y - anchorY;
+      // rotate + scale + noise
+      gk.tx = anchorX + (dx*Math.cos(rotAngle) - dy*Math.sin(rotAngle))*scaleF + (Math.random()-0.5)*40;
+      gk.ty = anchorY + (dx*Math.sin(rotAngle) + dy*Math.cos(rotAngle))*scaleF + (Math.random()-0.5)*40;
+    });
+  }
+
+  if (isMerging) {
+    ghost.mergeProgress = Math.min(1, ghost.mergeProgress + 0.005);
+    // targets are real positions
+    ghost.kps.forEach((gk, i) => {
+      gk.tx = realKps[i].x;
+      gk.ty = realKps[i].y;
+    });
+  } else {
+    ghost.mergeProgress = Math.max(0, ghost.mergeProgress - 0.008);
+  }
+
+  // Spring toward target
+  ghost.kps.forEach(gk => {
+    const stiffness = isMerging ? 0.04 : 0.025;
+    const damping = 0.82;
+    gk.vx = (gk.vx + (gk.tx - gk.x) * stiffness) * damping;
+    gk.vy = (gk.vy + (gk.ty - gk.y) * stiffness) * damping;
+    gk.x += gk.vx;
+    gk.y += gk.vy;
+  });
+
+  // Store trail from wrist
+  ghost.trailPoints.push({x: ghost.kps[0].x, y: ghost.kps[0].y, age: 0});
+  ghost.trailPoints = ghost.trailPoints
+    .map(p => ({...p, age: p.age+1}))
+    .filter(p => p.age < 40);
+}
+
+// ─── Draw helpers ─────────────────────────────────────────────────────────────
+
+function drawSkeleton(ctx, kps, color, lineW, dotR) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lineW;
+  ctx.lineCap = 'round';
+  FINGER_CONNECTIONS.forEach(([a,b]) => {
+    ctx.beginPath();
+    ctx.moveTo(kps[a].x, kps[a].y);
+    ctx.lineTo(kps[b].x, kps[b].y);
+    ctx.stroke();
+  });
+  ctx.fillStyle = color;
+  kps.forEach(k => {
+    ctx.beginPath();
+    ctx.arc(k.x, k.y, dotR, 0, Math.PI*2);
+    ctx.fill();
+  });
+}
+
+function drawGhostTrail(ctx, trail) {
+  trail.forEach(p => {
+    const alpha = (1 - p.age/40) * 0.12;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 2.5, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(140,180,255,${alpha})`;
+    ctx.fill();
+  });
+}
+
+// ─── Audio ────────────────────────────────────────────────────────────────────
+
+function initAudio() {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  // Base drone
+  droneOsc = audioCtx.createOscillator();
+  droneOsc.type = 'sine';
+  droneOsc.frequency.value = 82; // E2
+  droneGain = audioCtx.createGain();
+  droneGain.gain.value = 0;
+
+  // Subtle high drift tone
+  driftOsc = audioCtx.createOscillator();
+  driftOsc.type = 'sine';
+  driftOsc.frequency.value = 328;
+  driftGain = audioCtx.createGain();
+  driftGain.gain.value = 0;
+
+  // Reverb via convolver approximation using delay
+  const delay = audioCtx.createDelay(2.0);
+  delay.delayTime.value = 0.45;
+  const feedback = audioCtx.createGain();
+  feedback.gain.value = 0.55;
+  const delayGain = audioCtx.createGain();
+  delayGain.gain.value = 0.3;
+
+  droneOsc.connect(droneGain);
+  driftOsc.connect(driftGain);
+  droneGain.connect(audioCtx.destination);
+  droneGain.connect(delay);
+  driftGain.connect(audioCtx.destination);
+  driftGain.connect(delay);
+  delay.connect(feedback);
+  feedback.connect(delay);
+  delay.connect(delayGain);
+  delayGain.connect(audioCtx.destination);
+
+  droneOsc.start();
+  driftOsc.start();
+}
+
+function updateAudio(hasHands, mergeProgress, handY) {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const targetDrone = hasHands ? 0.06 : 0.0;
+  droneGain.gain.setTargetAtTime(targetDrone, t, 1.5);
+
+  // Drift tone pitch mapped to hand height
+  const norm = handY ? 1 - (handY / canvas.height) : 0.5;
+  const freq = 200 + norm * 280;
+  driftOsc.frequency.setTargetAtTime(freq, t, 0.4);
+  const targetDrift = hasHands ? 0.025 + mergeProgress * 0.04 : 0;
+  driftGain.gain.setTargetAtTime(targetDrift, t, 1.2);
+
+  // On merge, swell
+  if (mergeProgress > 0.85) {
+    droneGain.gain.setTargetAtTime(0.12, t, 0.5);
+  }
+}
+
+// ─── Main loop ────────────────────────────────────────────────────────────────
+
+function loop() {
+  if (!started) return requestAnimationFrame(loop);
+  const W = canvas.width, H = canvas.height;
+
+  ctx.clearRect(0, 0, W, H);
+
+  const now = Date.now();
+  const timeSilent = (now - lastMotionTime) / 1000; // seconds
+  merging = timeSilent > 2.5 && hands.length > 0;
+
+  // Merge message
+  const mergeMsg = document.getElementById('merge-msg');
+  if (merging) {
+    mergeMsg.classList.add('visible');
+  } else {
+    mergeMsg.classList.remove('visible');
+  }
+
+  const hasHands = hands.length > 0;
+  let avgHandY = null;
+  let avgMerge = 0;
+
+  // Scale factors: ml5 returns coords in video native resolution
+  const scaleX = W / (videoEl.videoWidth || 640);
+  const scaleY = H / (videoEl.videoHeight || 480);
+
+  hands.forEach((hand, hi) => {
+    // Scale from video space to canvas space, mirror X to match CSS-mirrored video
+    const kps = hand.keypoints.map(k => ({
+      x: W - (k.x * scaleX),
+      y: k.y * scaleY
+    }));
+
+    // Check motion
+    const motion = kps.reduce((acc, k, i) => {
+      const prev = ghostHands[hi] ? ghostHands[hi].kps[i] : k;
+      return acc + Math.abs(k.x - prev.x) + Math.abs(k.y - prev.y);
+    }, 0);
+    if (motion > 18) lastMotionTime = now;
+
+    // Init ghost if needed
+    if (!ghostHands[hi]) ghostHands[hi] = makeGhostHand(kps);
+
+    updateGhostHand(ghostHands[hi], kps, merging);
+    avgMerge += ghostHands[hi].mergeProgress;
+    avgHandY = kps[0].y;
+
+    // Draw ghost trail
+    drawGhostTrail(ctx, ghostHands[hi].trailPoints);
+
+    // Draw ghost skeleton
+    const mp = ghostHands[hi].mergeProgress;
+    const ghostAlpha = 0.45 + mp * 0.3;
+    drawSkeleton(ctx, ghostHands[hi].kps,
+      `rgba(140,185,255,${ghostAlpha})`, 1.2 - mp*0.5, 2.5);
+
+    // Glow on ghost joints
+    ghostHands[hi].kps.forEach(gk => {
+      const grd = ctx.createRadialGradient(gk.x, gk.y, 0, gk.x, gk.y, 10);
+      grd.addColorStop(0, `rgba(140,185,255,${0.15 + mp*0.1})`);
+      grd.addColorStop(1, 'transparent');
+      ctx.beginPath();
+      ctx.arc(gk.x, gk.y, 10, 0, Math.PI*2);
+      ctx.fillStyle = grd;
+      ctx.fill();
+    });
+
+    // Draw real skeleton (dimmer)
+    drawSkeleton(ctx, kps,
+      `rgba(255,255,255,${0.5 - mp*0.3})`, 1.0 - mp*0.4, 2.0);
+  });
+
+  // Clean up ghost hands for hands that disappeared
+  if (hands.length === 0) ghostHands = [];
+
+  avgMerge = hasHands ? avgMerge / hands.length : 0;
+  updateAudio(hasHands, avgMerge, avgHandY);
+
+  // Status text
+  const statusEl = document.getElementById('status');
+  if (!hasHands) {
+    statusEl.textContent = 'raise your hands — begin';
+    statusEl.style.opacity = '0.5';
+  } else if (merging) {
+    statusEl.textContent = 'be still — it is finding you';
+    statusEl.style.opacity = '0.7';
+  } else {
+    statusEl.textContent = 'move — keep it from you';
+    statusEl.style.opacity = '0.4';
+  }
+
+  // Debug readout
+  ctx.fillStyle = 'rgba(255,255,100,0.7)';
+  ctx.font = '13px monospace';
+  ctx.fillText(`hands: ${hands.length} | started: ${started} | audio: ${audioCtx?.state}`, 16, 24);
+  if (hands[0]) {
+    const k = hands[0].keypoints[0];
+    ctx.fillText(`wrist raw: ${k.x.toFixed(0)},${k.y.toFixed(0)} | video: ${videoEl.videoWidth}x${videoEl.videoHeight}`, 16, 42);
+  }
+
+  requestAnimationFrame(loop);
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+
+async function startExperience() {
+  const overlay = document.getElementById('start-overlay');
+  overlay.classList.add('fade');
+  setTimeout(() => overlay.remove(), 1600);
+
+  videoEl = document.getElementById('webcam');
+  canvas = document.getElementById('canvas');
+  ctx = canvas.getContext('2d');
+
+  // Size canvas to window
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  // Webcam
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+    videoEl.srcObject = stream;
+    await new Promise(r => { videoEl.onloadedmetadata = () => { videoEl.play(); r(); }; });
+  } catch(e) {
+    document.getElementById('status').textContent = 'camera access denied';
+    return;
+  }
+
+  document.getElementById('status').textContent = 'loading the model — one moment';
+
+  // Audio — must resume after user gesture
+  initAudio();
+  await audioCtx.resume();
+
+  // ML5 v1: constructor returns a promise, then use detectStart(video, callback)
+  handPose = await ml5.handPose({ maxHands: 2 });
+  console.log('HandPose ready');
+
+  handPose.detectStart(videoEl, (results) => {
+    hands = results || [];
+  });
+
+  started = true;
+  loop();
+}
+
+function randomBetween(a, b) { return a + Math.random()*(b-a); }
+</script>
+</body>
+</html>
